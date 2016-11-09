@@ -1,2 +1,2 @@
-# synologytools
-Scripts for Synology NAS
+# Tool scripts for Synology NAS
+
