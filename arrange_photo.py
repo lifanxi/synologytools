@@ -1,4 +1,5 @@
 #! /usr/bin/python2.7
+import argparse
 import re
 import sys
 import os
@@ -100,14 +101,31 @@ def get_date_from_meta(filename):
     return ("0", "0", "0")
 
 
-def get_date_from_file(filename):
+def get_date_from_file_stat(filename):
+    mtime = datetime.datetime.fromtimestamp(os.path.getctime(filename))
+    return (str(mtime.year), str(mtime.month), str(mtime.day))
+
+
+def get_date_from_file(filename, fallback_meta_fields):
     '''
     Use various ways to get date from file
     '''
-    y, m, _ = get_date_from_file_name(filename)
-    if y == "0" or m == "0":
-        y, m, _ = get_date_from_meta(filename)
-    return (y, m)
+    if not fallback_meta_fields:
+        y, m, _ = get_date_from_file_name(filename)
+        if y == "0" or m == "0":
+            y, m, _ = get_date_from_meta(filename)
+        return (y, m)
+    else:
+        for method in fallback_meta_fields.split(","):
+            if method == "name":
+                y, m, _ = get_date_from_file_name(filename)
+            elif method == "exif":
+                y, m, _ = get_date_from_meta(filename)
+            elif method == "mtime":
+                y, m, _ = get_date_from_file_stat(filename)
+            if y != "0" and m != "0":
+                return (y, m)
+    return ('0', '0')
 
 
 def check_conflict(old, new):
@@ -181,9 +199,9 @@ def check_valid(filename):
     Check if the file is valid to be indexed.
     '''
     (y1, m1, d1) = get_date_from_file_name(filename)
-    print(y1, m1, d1)
+    # print(y1, m1, d1)
     (y2, m2, d2) = get_date_from_meta(filename)
-    print(y2, m2, d2)
+    # print(y2, m2, d2)
     if y2 == "0":
         if y1 == "0":
             # Cannot get date information from file name or file meta, invalid
@@ -210,7 +228,7 @@ def check_valid(filename):
         return True
 
 
-def process(dirname, photo_root, ignore_index):
+def process(dirname, photo_root, ignore_index, fallback_meta_fields):
     if dirname == photo_root:
         print("src and dst directory can not be the same")
         return
@@ -222,12 +240,11 @@ def process(dirname, photo_root, ignore_index):
             full_file_name = os.path.join(root, f)
             # Invalid file will be skipped until they get fixed manually
             # If there is incosistency with the file, it may cause incorrect ordering in the photo library,
-            # especially when uploaded to Google Photos or re-indexed in moments.
-            if not check_valid(full_file_name):
+            # especially when uploaded to Google Photos or re-indexed in Moments.
+            if not fallback_meta_fields and not check_valid(full_file_name):
                 print("Found file with inconsistency %s" % full_file_name)
                 continue
-
-            (y, m) = get_date_from_file(full_file_name)
+            (y, m) = get_date_from_file(full_file_name, fallback_meta_fields)
             if y != "0":
                 # Generate the destination path for the file
                 new_path = os.path.join(photo_root, y, m, f)
@@ -250,12 +267,23 @@ def process(dirname, photo_root, ignore_index):
 
 
 if __name__ == '__main__':
-    ignore_index = False
-    if len(sys.argv) == 4 and sys.argv[3] == '--ignore-index':
-        ignore_index = True
-    if len(sys.argv) != 3 and len(sys.argv) != 4:
-        print("Usage: ./arrange <src dir> <dst dir> [--ignore-index]")
-        print("Without --ignore-index, <src dir> and <dst dir> MUST be the PhotoStation photo directory or a sub directory inside it")
-        sys.exit(-1)
-    process(os.path.abspath(sys.argv[1]),
-            os.path.abspath(sys.argv[2]), ignore_index)
+    parser = argparse.ArgumentParser(
+        description='Synology Photo Station Photo File Arrangement Tool')
+    parser.add_argument('src', metavar='src', type=str,
+                        help='Source Directory')
+    parser.add_argument('dst', metavar='dst', type=str,
+                        help='Destination Directory')
+    parser.add_argument('--ignore-index', dest='ignore_index', action="store_true", default=False,
+                        help='Disable index handling')
+    parser.add_argument('--fallback-meta-fields', dest='fallback_meta_fields', type=str, action="store",
+                        help='Set fallback meta fields: all, name, exif, mtime')
+    args = parser.parse_args()
+    if args.fallback_meta_fields:
+        for method in args.fallback_meta_fields.split(','):
+            if method == 'all':
+                args.fallback_meta_fields = 'name,exif,mtime'
+                break
+            if method not in ['name', 'exif', 'mtime']:
+                print("Valid fallback meta fields are: name, exif, mtime")
+                sys.exit(-1)
+    process(args.src, args.dst, args.ignore_index, args.fallback_meta_fields)
