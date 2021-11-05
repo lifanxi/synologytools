@@ -46,11 +46,11 @@ def run(dirname, method):
     db = create_db('./dup.db')
     # First we find all files and store file sizes to DB
     for root, _, files in os.walk(dirname):
-        print("Processing " + root + "...")
         if root.endswith("/.git") or root.find("/.git/") != -1 or root.endswith("/.svn") or root.find("/.svn/") != -1:
             continue
         if root.endswith("/@eaDir") or root.find("/@eaDir/") != -1:
             continue
+        print("Processing " + root + "...")
         for f in files:
             try:
                 full_file_name = os.path.join(root, f)
