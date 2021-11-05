@@ -6,14 +6,19 @@ import sqlite3
 
 
 def calc_file_hash(filename, size):
-    size10M = 10 * 1024 * 1024
-    if size < size10M:
+    '''
+    Calculate the file hash.
+    In order to have better performance, if the file is larger than 20MiB,
+    only the first and last 10MiB content of the file will take into consideration
+    '''
+    sample_size = 10 * 1024 * 1024
+    if size <= sample_size * 2:
         return hashlib.md5(open(filename, 'rb').read()).hexdigest()
     else:
         f = open(filename, 'rb')
-        md51 = hashlib.md5(f.read(size10M)).hexdigest()
-        f.seek(size - size10M)
-        return hashlib.md5(md51.encode() + f.read(size10M)).hexdigest()
+        md51 = hashlib.md5(f.read(sample_size)).hexdigest()
+        f.seek(size - sample_size)
+        return hashlib.md5((md51 + str(f.read(sample_size))).encode("utf-8")).hexdigest()
 
 
 def create_db(name):
