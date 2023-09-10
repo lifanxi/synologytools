@@ -13,7 +13,7 @@ def calc_file_hash(filename, size):
         f = open(filename, 'rb')
         md51 = hashlib.md5(f.read(size10M)).hexdigest()
         f.seek(size - size10M)
-        return hashlib.md5(md51 + f.read(size10M)).hexdigest()
+        return hashlib.md5(md51.encode() + f.read(size10M)).hexdigest()
 
 
 def create_db(name):
