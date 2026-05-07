@@ -38,33 +38,34 @@ def insert_file(db, dir, name, size):
                (size, name, '', dir))
 
 
-def run(dirname, method):
+def run(dirnames, method):
     try:
         os.unlink("./dup.db")
     except:
         pass
     db = create_db('./dup.db')
     # First we find all files and store file sizes to DB
-    for root, _, files in os.walk(dirname):
-        if root.endswith("/.git") or root.find("/.git/") != -1 or root.endswith("/.svn") or root.find("/.svn/") != -1:
-            continue
-        if root.endswith("/@eaDir") or root.find("/@eaDir/") != -1:
-            continue
-        print("Processing " + root + "...")
-        for f in files:
-            try:
-                full_file_name = os.path.join(root, f)
-                filedir = os.path.dirname(full_file_name)
-                filename = os.path.basename(full_file_name)
-                stat = os.lstat(full_file_name)
-                if stat.st_size == 0:
-                    print("Skip empty:\t%s" % (full_file_name))
-                elif os.path.islink(full_file_name):
-                    print("Skip soft link:\t%s" % (full_file_name))
-                else:
-                    insert_file(db, filedir, filename, stat.st_size)
-            except Exception as e:
-                print("Exception: " + str(e))
+    for dirname in dirnames:
+        for root, _, files in os.walk(dirname):
+            if root.endswith("/.git") or root.find("/.git/") != -1 or root.endswith("/.svn") or root.find("/.svn/") != -1:
+                continue
+            if root.endswith("/@eaDir") or root.find("/@eaDir/") != -1:
+                continue
+            print("Processing " + root + "...")
+            for f in files:
+                try:
+                    full_file_name = os.path.join(root, f)
+                    filedir = os.path.dirname(full_file_name)
+                    filename = os.path.basename(full_file_name)
+                    stat = os.lstat(full_file_name)
+                    if stat.st_size == 0:
+                        print("Skip empty:\t%s" % (full_file_name))
+                    elif os.path.islink(full_file_name):
+                        print("Skip soft link:\t%s" % (full_file_name))
+                    else:
+                        insert_file(db, filedir, filename, stat.st_size)
+                except Exception as e:
+                    print("Exception: " + str(e))
 
     # We find out all files with the same size and calculate their hashes
     print("Calculating file hashes ...")
@@ -116,16 +117,14 @@ def run(dirname, method):
             else:
                 output.write('''echo '%s' \n''' % escaped_file_name)
 
-    # Print db content
-    # for row in db.execute('''SELECT id, dir, name, size, hash FROM files WHERE dup = 1 ORDER BY size'''):
-    #    print((row[0], row[3], os.path.join(row[1], row[2]), row[4]))
-
     close_db(db)
 
 
 if __name__ == '__main__':
-    if len(sys.argv) != 3:
-        print("Usage: python ./dup.py <dir> <method>")
+    if len(sys.argv) < 3:
+        print("Usage: python ./dup.py <dir1> [dir2 ...] <method>")
         print("method can be check, delete, softlink, hardlink, reflink(BTRFS only)")
         sys.exit(-1)
-    run(os.path.abspath(sys.argv[1]), sys.argv[2].lower())
+    method = sys.argv[-1].lower()
+    dirnames = [os.path.abspath(d) for d in sys.argv[1:-1]]
+    run(dirnames, method)
